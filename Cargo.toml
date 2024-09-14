@@ -1,0 +1,31 @@
+[package]
+name = "rgtping"
+version = "0.1.0"
+edition = "2021"
+description = "ping(8) equivalent for GTPv1-U (3GPP TS 29.281)."
+authors = ["kaoru <k@warpnine.io>"]
+license = "GPL-2"
+homepage = "https://github.com/0x6b/rgtping"
+repository = "https://github.com/0x6b/rgtping"
+readme = "README.md"
+
+[dependencies]
+# GTPv1-U protocol implementation
+gtp-rs = { git = "https://github.com/ErvinsK/gtp-rs", version = "0.1.0" }
+
+# Error handling
+anyhow = "1.0.88"
+
+# Logging
+log = "0.4.22"
+env_logger = "0.11.5"
+
+# Command line argument parsing
+clap = { version = "4.5.17", features = ["derive", "wrap_help"] }
+
+# For JSON output
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
+
+# Async runtime
+tokio = { version = "1.40.0", features = ["full"] }
