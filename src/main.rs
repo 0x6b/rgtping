@@ -6,6 +6,8 @@ use env_logger::Env;
 use rgtping::{Pinger, Stats};
 use tokio::spawn;
 
+use crate::args::Format;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
@@ -39,7 +41,10 @@ async fn main() -> Result<()> {
     }
 
     // Print the results in JSON format
-    println!("{}", serde_json::to_string_pretty(&results)?);
+    match args.format {
+        Format::Json => println!("{}", serde_json::to_string_pretty(&results)?),
+        Format::Text => results.iter().for_each(|s| println!("{s}")),
+    }
 
     Ok(())
 }
