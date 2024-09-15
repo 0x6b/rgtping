@@ -32,17 +32,26 @@ ping(8) equivalent for GTPv1-U (3GPP TS 29.281).
 ## Usage
 
 ```console
-$ rgtping --help
+ping(8) equivalent for GTPv1-U (3GPP TS 29.281).
+
 Usage: rgtping [OPTIONS] [TARGET_IPS]...
 
 Arguments:
-  [TARGET_IPS]...  Array of IP address and port number (IP:port) to ping [default: 192.168.205.10:2152]
+  [TARGET_IPS]...  Array of IP address and port number (IP:port) to ping, delimited
+                   by a space
 
 Options:
-  -c, --count <COUNT>              Number of pings to send [default: 5]
-  -i, --interval-ms <INTERVAL_MS>  Interval between pings in milliseconds [default: 1000]
-  -h, --help                       Print help
-  -V, --version                    Print version
+  -c, --count <COUNT>
+          Number of pings to send [default: 5]
+  -i, --interval-ms <INTERVAL_MS>
+          Interval between pings in milliseconds [default: 1000]
+  -W, --timeout-ms <TIMEOUT_MS>
+          Time to wait for a response, in milliseconds. 0 means wait indefinitely
+          [default: 10000]
+  -h, --help
+          Print help
+  -V, --version
+          Print version
 ```
 
 ## Acknowledgement
