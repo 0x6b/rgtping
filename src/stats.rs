@@ -4,18 +4,30 @@ use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct Stats {
+    /// Gtping target IP address
     pub target: String,
-    pub sent: u64,
-    pub received: u64,
-    pub packet_loss_percentage: f64,
-    pub duplicate_packets: u64,
-    pub refused_packets: u64,
-    pub duration: f64,
-    pub min: f64,
-    pub max: f64,
-    pub avg: f64,
-    pub mdev: f64,
+    /// Epoch time of the start of the command, in milliseconds
     pub epoch_ms: u128,
+    /// Total duration in milliseconds
+    pub duration: f64,
+    /// Number of sent packets (including lost)
+    pub sent: u64,
+    /// Number of received packets
+    pub received: u64,
+    /// Packet loss percentage
+    pub packet_loss_percentage: f64,
+    /// Number of duplicate packets
+    pub duplicate_packets: u64,
+    /// Number of refused packets
+    pub refused_packets: u64,
+    /// Minimum RTT in milliseconds
+    pub min: f64,
+    /// Maximum RTT in milliseconds
+    pub max: f64,
+    /// Average RTT in milliseconds
+    pub avg: f64,
+    /// Mean deviation of RTT in milliseconds
+    pub mdev: f64,
 }
 
 impl Display for Stats {
