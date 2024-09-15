@@ -248,8 +248,8 @@ impl Pinger {
 
     /// Calculate statistics from the pings sent and received.
     pub fn calculate_stats(&self) -> Stats {
-        let mut min = 0f64;
-        let mut max = 0f64;
+        let mut min = f64::MAX;
+        let mut max = f64::MIN;
         let mut sum = 0.0;
         let mut count = 0;
 
