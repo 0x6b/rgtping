@@ -21,7 +21,10 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn new() -> Self {
+    /// Parse command line arguments and return the result. It's just a wrapper around
+    /// `clap::Parser::parse()` so that we can call it from the `main()` function without importing
+    /// `clap` at the top level.
+    pub fn from_cli() -> Self {
         Args::parse()
     }
 }

@@ -9,7 +9,7 @@ use tokio::spawn;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
-    let args = Args::new();
+    let args = Args::from_cli();
 
     // Holds the pinger instances
     let mut pingers = Vec::with_capacity(args.target_ips.len());
