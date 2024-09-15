@@ -1,6 +1,6 @@
 [package]
 name = "rgtping"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "ping(8) equivalent for GTPv1-U (3GPP TS 29.281)."
 authors = ["kaoru <k@warpnine.io>"]
