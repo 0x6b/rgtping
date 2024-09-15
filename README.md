@@ -49,6 +49,8 @@ Options:
   -W, --timeout-ms <TIMEOUT_MS>
           Time to wait for a response, in milliseconds. 0 means wait indefinitely
           [default: 10000]
+  -f, --format <FORMAT>
+          Output format, either "json" or "text" [default: json]
   -h, --help
           Print help
   -V, --version
