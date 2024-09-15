@@ -11,7 +11,7 @@ use crate::args::Format;
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
-    let Args { target_ips, count, interval_ms, timeout_ms, format } = Args::from_cli();
+    let Args { target_ips, count, interval_ms, timeout_ms, format } = Args::parse_from_cli();
 
     // Holds the pinger instances
     let mut pingers = Vec::with_capacity(target_ips.len());
