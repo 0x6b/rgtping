@@ -11,18 +11,18 @@ use crate::args::Format;
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
-    let args = Args::from_cli();
+    let Args { target_ips, count, interval_ms, timeout_ms, format } = Args::from_cli();
 
     // Holds the pinger instances
-    let mut pingers = Vec::with_capacity(args.target_ips.len());
+    let mut pingers = Vec::with_capacity(target_ips.len());
     // Holds the handles to the spawned threads which actually send the pings
-    let mut handles = Vec::with_capacity(args.target_ips.len());
+    let mut handles = Vec::with_capacity(target_ips.len());
     // Holds the results of the pings from each handle
-    let mut results = Vec::with_capacity(args.target_ips.len());
+    let mut results = Vec::with_capacity(target_ips.len());
 
     // Create a pinger for each target IP
-    for target in args.target_ips {
-        let pinger = Pinger::new(target, args.count, args.interval_ms, args.timeout_ms).await?;
+    for target in target_ips {
+        let pinger = Pinger::new(target, count, interval_ms, timeout_ms).await?;
         pingers.push(pinger);
     }
 
@@ -41,7 +41,7 @@ async fn main() -> Result<()> {
     }
 
     // Print the results in JSON format
-    match args.format {
+    match format {
         Format::Json => println!("{}", serde_json::to_string_pretty(&results)?),
         Format::Text => results.iter().for_each(|s| println!("{s}")),
     }
