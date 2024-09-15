@@ -1,4 +1,5 @@
 use std::{
+    io,
     net::SocketAddr,
     ops::Add,
     time::{Duration, SystemTime},
@@ -136,7 +137,7 @@ impl Pinger {
                     );
                 }
                 Err(e) => {
-                    if e.kind() == std::io::ErrorKind::ConnectionRefused {
+                    if e.kind() == io::ErrorKind::ConnectionRefused {
                         error!("Connection refused");
                     }
                     self.refused_packets += 1;

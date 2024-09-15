@@ -1,13 +1,13 @@
 mod args;
 
-use anyhow::Error;
+use anyhow::{Error, Result};
 use args::Args;
 use env_logger::Env;
 use rgtping::{Pinger, Stats};
 use tokio::spawn;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let args = Args::from_cli();
 
