@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 
 use clap::Parser;
 
+/// Command line arguments
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
 pub struct Args {

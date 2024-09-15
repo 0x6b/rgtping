@@ -16,6 +16,8 @@ use crate::Stats;
 
 const TRACK_PINGS_SIZE: usize = 1024;
 
+/// Pinger struct to send and receive GTPv1-U packets. All fields are private, so you can only
+/// create a new instance using the `new` method.
 #[derive(Debug)]
 pub struct Pinger {
     // UDP socket to send and receive GTPv1-U packets
@@ -59,6 +61,15 @@ pub struct Pinger {
 }
 
 impl Pinger {
+    /// Create a new Pinger instance.
+    ///
+    /// # Arguments
+    ///
+    /// - `peer`: [`SocketAddr`] of the peer to ping
+    /// - `count`: Number of pings to send
+    /// - `interval_ms`: Interval between pings in milliseconds
+    /// - `timeout_ms`: Time to wait for a response, in milliseconds. 0 means wait (almost)
+    ///   indefinitely.
     pub async fn new(
         peer: SocketAddr,
         count: u64,
@@ -102,6 +113,9 @@ impl Pinger {
         Ok(pinger)
     }
 
+    /// Send `count` pings to the peer and wait for a response. This method will send a ping, wait
+    /// for a response, and then sleep for `interval` milliseconds. If a response is not received
+    /// within `timeout` milliseconds, the method will continue to the next ping.
     pub async fn ping(&mut self) -> Result<()> {
         debug!("Start pinging for {}", self.peer);
         for _ in 0..self.count {
@@ -135,6 +149,10 @@ impl Pinger {
             self.last_ping_time = Instant::now();
 
             trace!("Waiting for response");
+            // To implement the timeout, we use tokio::select! macro. This macro allows us to
+            // wait for multiple futures to complete, and then execute the branch that completes
+            // first. In this case, we wait for the timeout to expire or for a response to be
+            // received.
             tokio::select! {
                 _ = async { sleep_until(Instant::now().add(self.timeout)).await } => {
                     debug!("Timed out");
@@ -209,6 +227,7 @@ impl Pinger {
         Ok(())
     }
 
+    /// Calculate statistics from the pings sent and received.
     pub fn calculate_stats(&self) -> Stats {
         let mut min = 0f64;
         let mut max = 0f64;

@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use serde::Serialize;
 
+/// Holds results from a series of GTP ping commands
 #[derive(Debug, Serialize)]
 pub struct Stats {
     /// Gtping target IP address
@@ -31,6 +32,7 @@ pub struct Stats {
 }
 
 impl Display for Stats {
+    /// Formats the statistics in a human-readable format, as close as possible to ping
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = String::new();
         s.push('\n');
