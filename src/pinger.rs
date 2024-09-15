@@ -51,13 +51,20 @@ pub struct Pinger {
     // last receive time to calculate RTT
     last_receive_time: Instant,
     // interval between pings in milliseconds
-    interval_ms: Duration,
+    interval: Duration,
+    // time to wait for a response in milliseconds
+    timeout: Duration,
     // number of pings to send
     count: u64,
 }
 
 impl Pinger {
-    pub async fn new(peer: SocketAddr, count: u64, interval_ms: u64) -> Result<Self> {
+    pub async fn new(
+        peer: SocketAddr,
+        count: u64,
+        interval_ms: u64,
+        timeout_ms: u64,
+    ) -> Result<Self> {
         let mut packet = Gtpv1Header {
             msgtype: ECHO_REQUEST,
             sequence_number: Some(0),
@@ -73,8 +80,8 @@ impl Pinger {
         let pinger = Pinger {
             socket: UdpSocket::bind("0.0.0.0:0").await?,
             peer,
-            seq: 0,
             packet,
+            seq: 0,
             send_buf: Vec::with_capacity(header_size as usize),
             recv_buf: [0; 1024],
             sent: 0,
@@ -87,7 +94,8 @@ impl Pinger {
             start_time: now,
             last_ping_time: now,
             last_receive_time: now,
-            interval_ms: Duration::from_millis(interval_ms),
+            interval: Duration::from_millis(interval_ms),
+            timeout: Duration::from_secs(if timeout_ms == 0 { u64::MAX } else { timeout_ms }),
             count,
         };
         debug!("Pinger created for {}", pinger.peer);
@@ -128,7 +136,7 @@ impl Pinger {
 
             trace!("Waiting for response");
             tokio::select! {
-                _ = async { sleep_until(Instant::now().add(self.interval_ms)).await } => {
+                _ = async { sleep_until(Instant::now().add(self.timeout)).await } => {
                     debug!("Timed out");
                 }
                 result = self.socket.recv_from(&mut self.recv_buf) => {
@@ -174,12 +182,12 @@ impl Pinger {
                             }
                             self.received += 1;
 
-                            sleep(self.interval_ms).await;
+                            sleep(self.interval).await;
                         },
                         Err(_) => {
                             error!("Port closed");
                             self.seq += 1;
-                            sleep(self.interval_ms).await;
+                            sleep(self.interval).await;
                             continue;
                         }
                     }

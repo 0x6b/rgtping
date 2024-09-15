@@ -14,6 +14,9 @@ pub struct Args {
     /// Interval between pings in milliseconds
     #[arg(short, long, default_value = "1000")]
     pub interval_ms: u64,
+    /// Time to wait for a response, in milliseconds. 0 means wait indefinitely.
+    #[arg(short = 'W', long, default_value = "10000")]
+    pub timeout_ms: u64,
 }
 
 impl Args {

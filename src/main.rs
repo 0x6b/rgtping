@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let mut results = Vec::with_capacity(args.target_ips.len());
 
     for target in args.target_ips {
-        let pinger = Pinger::new(target, args.count, args.interval_ms).await?;
+        let pinger = Pinger::new(target, args.count, args.interval_ms, args.timeout_ms).await?;
         pingers.push(pinger);
     }
 
