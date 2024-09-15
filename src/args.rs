@@ -42,9 +42,9 @@ impl From<&str> for Format {
 
 impl Args {
     /// Parse command line arguments and return the result. It's just a wrapper around
-    /// `clap::Parser::parse()` so that we can call it from the `main()` function without importing
-    /// `clap` at the top level.
-    pub fn from_cli() -> Self {
+    /// [`clap::Parser::parse()`], but is defined here so that we can call it without importing
+    /// `clap::Parser` at the call site.
+    pub fn parse_from_cli() -> Self {
         Args::parse()
     }
 }
