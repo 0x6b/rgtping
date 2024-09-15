@@ -8,26 +8,27 @@ ping(8) equivalent for GTPv1-U (3GPP TS 29.281).
 ## Features
 
 - Send GTPv1-U Echo request to multiple endpoints simultaneously.
-  - Output is an array of JSON objects, one for each endpoint e.g.
-    ```json5
-    [
-      {
-        "target": "192.168.205.10:2152", /// Gtping target IP address
-        "epoch_ms": 1726372276714, /// Epoch time of the start of the command, in milliseconds
-        "duration": 3026.165084, /// Total duration in milliseconds
-        "sent": 3, /// Number of sent packets (including lost)
-        "received": 3, /// Number of received packets
-        "packet_loss_percentage": 0.0, /// Packet loss percentage
-        "duplicate_packets": 0, /// Number of duplicate packets
-        "refused_packets": 0, /// Number of refused packets
-        "min": 0.0, /// Minimum RTT in milliseconds
-        "max": 14.750917000000001, /// Maximum RTT in milliseconds
-        "avg": 5.607903, /// Average RTT in milliseconds
-        "mdev": 6.4650903803150355 /// Mean deviation of RTT in milliseconds
-      }
-      // ...
-    ]
-    ```
+- Output is an array of JSON objects, one for each endpoint e.g.
+  ```json5
+  [
+    {
+      "target": "192.168.205.10:2152", /// Gtping target IP address
+      "epoch_ms": 1726372276714, /// Epoch time of the start of the command, in milliseconds
+      "duration": 3026.165084, /// Total duration in milliseconds
+      "sent": 3, /// Number of sent packets (including lost)
+      "received": 3, /// Number of received packets
+      "packet_loss_percentage": 0.0, /// Packet loss percentage
+      "duplicate_packets": 0, /// Number of duplicate packets
+      "refused_packets": 0, /// Number of refused packets
+      "timed_out_packets": 0, /// Number of timed out packets
+      "min": 0.0, /// Minimum RTT in milliseconds
+      "max": 14.750917000000001, /// Maximum RTT in milliseconds
+      "avg": 5.607903, /// Average RTT in milliseconds
+      "mdev": 6.4650903803150355 /// Mean deviation of RTT in milliseconds
+    }
+    // ...
+  ]
+  ```
 
 ## Usage
 
