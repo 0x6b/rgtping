@@ -107,7 +107,7 @@ impl Pinger {
             last_ping_time: now,
             last_receive_time: now,
             interval: Duration::from_millis(interval_ms),
-            timeout: Duration::from_secs(if timeout_ms == 0 { u64::MAX } else { timeout_ms }),
+            timeout: Duration::from_millis(if timeout_ms == 0 { u64::MAX } else { timeout_ms }),
             count,
         };
         debug!("Pinger created for {}", pinger.peer);
