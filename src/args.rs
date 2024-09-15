@@ -18,6 +18,26 @@ pub struct Args {
     /// Time to wait for a response, in milliseconds. 0 means wait indefinitely.
     #[arg(short = 'W', long, default_value = "10000")]
     pub timeout_ms: u64,
+    /// Output format, either "json" or "text"
+    #[arg(short, long, default_value = "json")]
+    pub format: Format,
+}
+
+/// Output format
+#[derive(Debug, Clone)]
+pub enum Format {
+    Json,
+    Text,
+}
+
+impl From<&str> for Format {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str().chars().next().unwrap() {
+            'j' => Format::Json,
+            't' => Format::Text,
+            _ => Format::Text,
+        }
+    }
 }
 
 impl Args {

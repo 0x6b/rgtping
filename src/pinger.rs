@@ -5,7 +5,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use gtp_rs::gtpv1::gtpu::{EchoResponse, Gtpv1Header, Messages, ECHO_REQUEST, MIN_HEADER_LENGTH};
 use log::{debug, error, trace};
 use tokio::{
@@ -45,6 +45,8 @@ pub struct Pinger {
     duplicate_packets: u64,
     // Number of refused packets
     refused_packets: u64,
+    // Number of timed out packets
+    timed_out_packets: i32,
     // Epoch time of the start of the operation, in milliseconds
     epoch_ms: u128,
     // Start time of the command for statistics
@@ -102,6 +104,7 @@ impl Pinger {
             received_packets: [0u64; TRACK_PINGS_SIZE],
             duplicate_packets: 0,
             refused_packets: 0,
+            timed_out_packets: 0,
             epoch_ms,
             start_time: now,
             last_ping_time: now,
@@ -138,9 +141,9 @@ impl Pinger {
                 }
                 Err(e) => {
                     if e.kind() == io::ErrorKind::ConnectionRefused {
-                        error!("Connection refused");
+                        error!("Connection refused: {}", self.peer);
+                        self.refused_packets += 1;
                     }
-                    self.refused_packets += 1;
                     continue;
                 }
             }
@@ -156,76 +159,91 @@ impl Pinger {
             // received.
             tokio::select! {
                 _ = async { sleep_until(Instant::now().add(self.timeout)).await } => {
-                    debug!("Timed out");
+                    error!("Timeout {} ms exceeded: {}", self.timeout.as_millis(), self.peer);
+                    self.timed_out_packets += 1;
                 }
                 result = self.socket.recv_from(&mut self.recv_buf) => {
-                    match result {
-                        Ok((n, src)) => {
-                            trace!("Received data {} from {}", &self.recv_buf[..n].iter()
-                                .fold(String::new(), |acc, &b| format!("{acc} {b:02X}"))
-                                .trim(),
-                                 self.peer);
-                            let response = EchoResponse::unmarshal(&self.recv_buf[..n])?;
-                            self.last_receive_time = Instant::now();
-                            let duration = self
-                                .last_receive_time
-                                .duration_since(self.last_ping_time)
-                                .as_secs_f64()
-                                * 1000f64;
-                            debug!(
-                                "{n} bytes from {}: ver={} seq={} time={:.2} ms {}",
-                                src.ip(),
-                                self.recv_buf[0] >> 5, // always 1, though
-                                response.header.sequence_number.unwrap_or(0),
-                                duration,
-                                if self.received_packets[self.seq as usize % TRACK_PINGS_SIZE] > 1 {
-                                    "(DUP)"
-                                } else {
-                                    ""
-                                }
-                            );
-
-                            // Some servers send a reply with a sequence number of 0, so we need to check if the
-                            // sequence number is set and if not, use the last sequence number
-                            let seq = if let Some(seq) = response.header.sequence_number {
-                                seq
-                            } else {
-                                self.packet.sequence_number.unwrap_or(0)
-                            };
-
-                            // Update stats
-                            self.send_times[seq as usize % TRACK_PINGS_SIZE] = duration;
-                            self.received_packets[seq as usize % TRACK_PINGS_SIZE] += 1;
-                            if self.received_packets[seq as usize % TRACK_PINGS_SIZE] > 1 {
-                                self.duplicate_packets += 1;
-                            }
-                            self.received += 1;
-
+                    match self.process_received(result).await {
+                        Ok(_) => {
                             sleep(self.interval).await;
-                        },
-                        Err(_) => {
-                            error!("Port closed");
-                            self.seq += 1;
+                        }
+                        Err(e) => {
+                            error!("{e}");
                             sleep(self.interval).await;
                             continue;
                         }
                     }
                 }
-
             }
         }
 
         debug!("Finish pinging for {}", self.peer);
         trace!(
-            "Stats: epoch: {}, sent: {}, received: {}, duplicate: {}, refused: {}, seq: {}",
+            "Stats: epoch: {}, sent: {}, received: {}, duplicate: {}, refused: {}, timed out: {}, seq: {}",
             self.epoch_ms,
             self.sent,
             self.received,
             self.duplicate_packets,
             self.refused_packets,
+            self.timed_out_packets,
             self.seq
         );
         Ok(())
+    }
+
+    async fn process_received(&mut self, result: io::Result<(usize, SocketAddr)>) -> Result<()> {
+        match result {
+            Ok((n, src)) => {
+                trace!(
+                    "Received data {} from {}",
+                    &self.recv_buf[..n]
+                        .iter()
+                        .fold(String::new(), |acc, &b| format!("{acc} {b:02X}"))
+                        .trim(),
+                    self.peer
+                );
+                let response = EchoResponse::unmarshal(&self.recv_buf[..n])?;
+                self.last_receive_time = Instant::now();
+                let duration = self
+                    .last_receive_time
+                    .duration_since(self.last_ping_time)
+                    .as_secs_f64()
+                    * 1000f64;
+                debug!(
+                    "{n} bytes from {}: ver={} seq={} time={:.2} ms {}",
+                    src.ip(),
+                    self.recv_buf[0] >> 5, // always 1, though
+                    response.header.sequence_number.unwrap_or(0),
+                    duration,
+                    if self.received_packets[self.seq as usize % TRACK_PINGS_SIZE] > 1 {
+                        "(DUP)"
+                    } else {
+                        ""
+                    }
+                );
+
+                // Some servers send a reply with a sequence number of 0, so we need to check if the
+                // sequence number is set and if not, use the last sequence number
+                let seq = if let Some(seq) = response.header.sequence_number {
+                    seq
+                } else {
+                    self.packet.sequence_number.unwrap_or(0)
+                };
+
+                // Update stats
+                self.send_times[seq as usize % TRACK_PINGS_SIZE] = duration;
+                self.received_packets[seq as usize % TRACK_PINGS_SIZE] += 1;
+                if self.received_packets[seq as usize % TRACK_PINGS_SIZE] > 1 {
+                    self.duplicate_packets += 1;
+                }
+                self.received += 1;
+                Ok(())
+            }
+            Err(e) => {
+                sleep(self.interval).await;
+                Err(anyhow!("{e}"))
+            }
+        }
     }
 
     /// Calculate statistics from the pings sent and received.
@@ -261,6 +279,7 @@ impl Pinger {
             packet_loss_percentage: (self.sent - self.received) as f64 / self.sent as f64 * 100f64,
             duplicate_packets: self.duplicate_packets,
             refused_packets: self.refused_packets,
+            timed_out_packets: self.timed_out_packets,
             duration: self.start_time.elapsed().as_secs_f64() * 1000f64,
             min,
             avg,

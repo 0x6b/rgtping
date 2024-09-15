@@ -21,6 +21,8 @@ pub struct Stats {
     pub duplicate_packets: u64,
     /// Number of refused packets
     pub refused_packets: u64,
+    /// Number of timed out packets
+    pub timed_out_packets: i32,
     /// Minimum RTT in milliseconds
     pub min: f64,
     /// Maximum RTT in milliseconds
@@ -47,8 +49,8 @@ impl Display for Stats {
         ));
         s.push('\n');
         s.push_str(&format!(
-            "{} dups, {} connection refused",
-            self.duplicate_packets, self.refused_packets
+            "{} dups, {} connection refused, {} timed out",
+            self.duplicate_packets, self.refused_packets, self.timed_out_packets
         ));
         s.push('\n');
         s.push_str(&format!(
