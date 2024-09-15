@@ -1,4 +1,5 @@
 use std::{
+    io,
     net::SocketAddr,
     ops::Add,
     time::{Duration, SystemTime},
@@ -16,6 +17,8 @@ use crate::Stats;
 
 const TRACK_PINGS_SIZE: usize = 1024;
 
+/// Pinger struct to send and receive GTPv1-U packets. All fields are private, so you can only
+/// create a new instance using the `new` method.
 #[derive(Debug)]
 pub struct Pinger {
     // UDP socket to send and receive GTPv1-U packets
@@ -30,34 +33,50 @@ pub struct Pinger {
     send_buf: Vec<u8>,
     // Internal buffer to store received data
     recv_buf: [u8; 1024],
-    // number of sent packets (including lost)
+    // Number of sent packets (including lost)
     sent: u64,
-    // number of received packets
+    // Number of received packets
     received: u64,
-    // track times needed to send packets for statistics
+    // Array to track times needed to send packets for statistics
     send_times: [f64; TRACK_PINGS_SIZE],
-    // track received packets to detect duplicates
+    // Array to track received packets to detect duplicates
     received_packets: [u64; TRACK_PINGS_SIZE],
-    // number of duplicate packets
+    // Number of duplicate packets
     duplicate_packets: u64,
-    // number of refused packets
+    // Number of refused packets
     refused_packets: u64,
-    // epoch time of the start of the operation, in milliseconds
+    // Epoch time of the start of the operation, in milliseconds
     epoch_ms: u128,
-    // start time of the command for statistics
+    // Start time of the command for statistics
     start_time: Instant,
-    // last ping time to calculate RTT
+    // Last ping time to calculate RTT
     last_ping_time: Instant,
-    // last receive time to calculate RTT
+    // Last receive time to calculate RTT
     last_receive_time: Instant,
-    // interval between pings in milliseconds
-    interval_ms: Duration,
-    // number of pings to send
+    // Interval between pings in milliseconds
+    interval: Duration,
+    // Time to wait for a response in milliseconds
+    timeout: Duration,
+    // Number of pings to send
     count: u64,
 }
 
 impl Pinger {
-    pub async fn new(peer: SocketAddr, count: u64, interval_ms: u64) -> Result<Self> {
+    /// Create a new Pinger instance.
+    ///
+    /// # Arguments
+    ///
+    /// - `peer`: [`SocketAddr`] of the peer to ping
+    /// - `count`: Number of pings to send
+    /// - `interval_ms`: Interval between pings in milliseconds
+    /// - `timeout_ms`: Time to wait for a response, in milliseconds. 0 means wait (almost)
+    ///   indefinitely.
+    pub async fn new(
+        peer: SocketAddr,
+        count: u64,
+        interval_ms: u64,
+        timeout_ms: u64,
+    ) -> Result<Self> {
         let mut packet = Gtpv1Header {
             msgtype: ECHO_REQUEST,
             sequence_number: Some(0),
@@ -73,8 +92,8 @@ impl Pinger {
         let pinger = Pinger {
             socket: UdpSocket::bind("0.0.0.0:0").await?,
             peer,
-            seq: 0,
             packet,
+            seq: 0,
             send_buf: Vec::with_capacity(header_size as usize),
             recv_buf: [0; 1024],
             sent: 0,
@@ -87,13 +106,17 @@ impl Pinger {
             start_time: now,
             last_ping_time: now,
             last_receive_time: now,
-            interval_ms: Duration::from_millis(interval_ms),
+            interval: Duration::from_millis(interval_ms),
+            timeout: Duration::from_millis(if timeout_ms == 0 { u64::MAX } else { timeout_ms }),
             count,
         };
         debug!("Pinger created for {}", pinger.peer);
         Ok(pinger)
     }
 
+    /// Send `count` pings to the peer and wait for a response. This method will send a ping, wait
+    /// for a response, and then sleep for `interval` milliseconds. If a response is not received
+    /// within `timeout` milliseconds, the method will continue to the next ping.
     pub async fn ping(&mut self) -> Result<()> {
         debug!("Start pinging for {}", self.peer);
         for _ in 0..self.count {
@@ -114,7 +137,7 @@ impl Pinger {
                     );
                 }
                 Err(e) => {
-                    if e.kind() == std::io::ErrorKind::ConnectionRefused {
+                    if e.kind() == io::ErrorKind::ConnectionRefused {
                         error!("Connection refused");
                     }
                     self.refused_packets += 1;
@@ -127,8 +150,12 @@ impl Pinger {
             self.last_ping_time = Instant::now();
 
             trace!("Waiting for response");
+            // To implement the timeout, we use tokio::select! macro. This macro allows us to
+            // wait for multiple futures to complete, and then execute the branch that completes
+            // first. In this case, we wait for the timeout to expire or for a response to be
+            // received.
             tokio::select! {
-                _ = async { sleep_until(Instant::now().add(self.interval_ms)).await } => {
+                _ = async { sleep_until(Instant::now().add(self.timeout)).await } => {
                     debug!("Timed out");
                 }
                 result = self.socket.recv_from(&mut self.recv_buf) => {
@@ -174,12 +201,12 @@ impl Pinger {
                             }
                             self.received += 1;
 
-                            sleep(self.interval_ms).await;
+                            sleep(self.interval).await;
                         },
                         Err(_) => {
                             error!("Port closed");
                             self.seq += 1;
-                            sleep(self.interval_ms).await;
+                            sleep(self.interval).await;
                             continue;
                         }
                     }
@@ -201,6 +228,7 @@ impl Pinger {
         Ok(())
     }
 
+    /// Calculate statistics from the pings sent and received.
     pub fn calculate_stats(&self) -> Stats {
         let mut min = 0f64;
         let mut max = 0f64;

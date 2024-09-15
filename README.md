@@ -8,40 +8,50 @@ ping(8) equivalent for GTPv1-U (3GPP TS 29.281).
 ## Features
 
 - Send GTPv1-U Echo request to multiple endpoints simultaneously.
-- Output is an array of JSON objects, one for each endpoint e.g.
+  - Output is an array of JSON objects, one for each endpoint e.g.
     ```json5
     [
       {
-        "target": "192.168.205.10:2152",
-        "sent": 10, // Number of packets sent
-        "received": 10, // Number of packets received
-        "packet_loss_percentage": 0.0, // Packet loss percentage
-        "duplicate_packets": 0, // Number of duplicate packets
-        "refused_packets": 0, // Number of refused packets (maybe incorrect)
-        "duration": 10164.467290999999, // Total duration in milliseconds
-        "min": 0.0, // Minimum RTT in milliseconds
-        "max": 53.558417, // Maximum RTT in milliseconds
-        "avg": 13.0501917, // Average RTT in milliseconds
-        "mdev": 14.24073989248037, // Standard deviation of RTT in milliseconds
-        "epoch_ms": 1726323245070 // epoch time of the start of the operation, in milliseconds
+        "target": "192.168.205.10:2152", /// Gtping target IP address
+        "epoch_ms": 1726372276714, /// Epoch time of the start of the command, in milliseconds
+        "duration": 3026.165084, /// Total duration in milliseconds
+        "sent": 3, /// Number of sent packets (including lost)
+        "received": 3, /// Number of received packets
+        "packet_loss_percentage": 0.0, /// Packet loss percentage
+        "duplicate_packets": 0, /// Number of duplicate packets
+        "refused_packets": 0, /// Number of refused packets
+        "min": 0.0, /// Minimum RTT in milliseconds
+        "max": 14.750917000000001, /// Maximum RTT in milliseconds
+        "avg": 5.607903, /// Average RTT in milliseconds
+        "mdev": 6.4650903803150355 /// Mean deviation of RTT in milliseconds
       }
+      // ...
     ]
     ```
 
 ## Usage
 
 ```console
-$ rgtping --help
+ping(8) equivalent for GTPv1-U (3GPP TS 29.281).
+
 Usage: rgtping [OPTIONS] [TARGET_IPS]...
 
 Arguments:
-  [TARGET_IPS]...  Array of IP address and port number (IP:port) to ping [default: 192.168.205.10:2152]
+  [TARGET_IPS]...  Array of IP address and port number (IP:port) to ping, delimited
+                   by a space
 
 Options:
-  -c, --count <COUNT>              Number of pings to send [default: 5]
-  -i, --interval-ms <INTERVAL_MS>  Interval between pings in milliseconds [default: 1000]
-  -h, --help                       Print help
-  -V, --version                    Print version
+  -c, --count <COUNT>
+          Number of pings to send [default: 5]
+  -i, --interval-ms <INTERVAL_MS>
+          Interval between pings in milliseconds [default: 1000]
+  -W, --timeout-ms <TIMEOUT_MS>
+          Time to wait for a response, in milliseconds. 0 means wait indefinitely
+          [default: 10000]
+  -h, --help
+          Print help
+  -V, --version
+          Print version
 ```
 
 ## Acknowledgement
