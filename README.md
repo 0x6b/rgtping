@@ -5,6 +5,9 @@ ping(8) equivalent for GTPv1-U (3GPP TS 29.281).
 > [!WARNING]
 > Error handling is not really implemented. This is a toy project for my own learning. Not recommended for production monitoring.
 
+> [!WARNING]
+> If you are time-sensitive, please avoid using this multithreaded and asynchronous implementation of gtping. A large number of asynchronous events waiting to wake up can lead to inaccurate timing calculations. Instead, you can use the original gtping command directly.
+
 ## Features
 
 - Send GTPv1-U Echo request to multiple endpoints simultaneously.
