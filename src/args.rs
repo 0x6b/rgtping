@@ -1,13 +1,15 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, str::FromStr};
 
+use anyhow::Result;
 use clap::Parser;
 
 /// Command line arguments
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
 pub struct Args {
-    /// Array of IP address and port number (IP:port) to ping, delimited by a space
-    #[arg(value_delimiter = ' ')]
+    /// Array of IP address and port number (IP:port) to ping, delimited by a space. If port is not
+    /// specified, it defaults to 2152.
+    #[clap(value_parser=parse_socket_addr)]
     pub target_ips: Vec<SocketAddr>,
     /// Number of pings to send
     #[arg(short, long, default_value = "5")]
@@ -21,6 +23,11 @@ pub struct Args {
     /// Output format, either "json" or "text"
     #[arg(short, long, default_value = "json")]
     pub format: Format,
+}
+
+fn parse_socket_addr(arg: &str) -> Result<SocketAddr> {
+    let arg = if arg.trim().contains(':') { arg } else { &format!("{arg}:2152") };
+    SocketAddr::from_str(arg).map_err(|e| e.into())
 }
 
 /// Output format
