@@ -7,8 +7,8 @@ use clap::Parser;
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
 pub struct Args {
-    /// Array of IP address and port number (IP:port) to ping, delimited by a space. If port is not
-    /// specified, it defaults to 2152.
+    /// An array of IP addresses and port numbers (IP:port) to ping, separated by spaces. If a port
+    /// is not specified, it defaults to 2152.
     #[clap(value_parser=parse_socket_addr)]
     pub target_ips: Vec<SocketAddr>,
     /// Number of pings to send
