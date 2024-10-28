@@ -1,7 +1,7 @@
 use std::{
     io,
     net::SocketAddr,
-    ops::Add,
+    ops::{Add, Sub},
     time::{Duration, SystemTime},
 };
 
@@ -21,46 +21,52 @@ const TRACK_PINGS_SIZE: usize = 1024;
 /// create a new instance using the `new` method.
 #[derive(Debug)]
 pub struct Pinger {
-    // UDP socket to send and receive GTPv1-U packets
+    /// UDP socket to send and receive GTPv1-U packets
     socket: UdpSocket,
-    // IP address and port of the peer
+    /// IP address and port of the peer
     peer: SocketAddr,
-    // GTPv1-U header to be sent
+    /// GTPv1-U header to be sent
     packet: Gtpv1Header,
-    // Sequence number of the packet
+    /// Sequence number of the packet
     seq: u16,
-    // Internal buffer for sending data
+    /// Internal buffer for sending data
     send_buf: Vec<u8>,
-    // Internal buffer to store received data
+    /// Internal buffer to store received data
     recv_buf: [u8; 1024],
-    // Number of sent packets (including lost)
-    sent: u64,
-    // Number of received packets
-    received: u64,
-    // Array to track times needed to send packets for statistics
-    send_times: [f64; TRACK_PINGS_SIZE],
-    // Array to track received packets to detect duplicates
-    received_packets: [u64; TRACK_PINGS_SIZE],
-    // Number of duplicate packets
-    duplicate_packets: u64,
-    // Number of refused packets
-    refused_packets: u64,
-    // Number of timed out packets
-    timed_out_packets: i32,
-    // Epoch time of the start of the operation, in milliseconds
-    epoch_ms: u128,
-    // Start time of the command for statistics
-    start_time: Instant,
-    // Last ping time to calculate RTT
-    last_ping_time: Instant,
-    // Last receive time to calculate RTT
-    last_receive_time: Instant,
-    // Interval between pings in milliseconds
+    /// Interval between pings in milliseconds
     interval: Duration,
-    // Time to wait for a response in milliseconds
+    /// Time to wait for a response in milliseconds
     timeout: Duration,
-    // Number of pings to send
+    /// Number of pings to send
     count: u64,
+    /// ping statistics
+    statistics: Statistics,
+}
+
+#[derive(Debug)]
+pub struct Statistics {
+    /// Number of sent packets (including lost)
+    sent: u64,
+    /// Number of received packets
+    received: u64,
+    /// Array to track times needed to send packets for statistics
+    send_times: [f64; TRACK_PINGS_SIZE],
+    /// Array to track received packets to detect duplicates
+    received_packets: [u64; TRACK_PINGS_SIZE],
+    /// Number of duplicate packets
+    duplicate_packets: u64,
+    /// Number of refused packets
+    refused_packets: u64,
+    /// Number of timed out packets
+    timed_out_packets: i32,
+    /// Epoch time of the start of the operation, in milliseconds
+    epoch_ms: u128,
+    /// Start time of the command for statistics
+    start_time: Instant,
+    /// Last ping time to calculate RTT
+    last_ping_time: Instant,
+    /// Last receive time to calculate RTT
+    last_receive_time: Instant,
 }
 
 impl Pinger {
@@ -84,9 +90,8 @@ impl Pinger {
             sequence_number: Some(0),
             ..Gtpv1Header::default()
         };
-        // GTPv1 minimum header size is 8 bytes. When options are present,
-        // the header size is 12 bytes. The length field is the total
-        //length of optional header + payload.
+        // GTPv1 minimum header size is 8 bytes. When options are present, the header size is 12
+        // bytes. The length field is the total length of optional header + payload.
         let header_size = packet.get_header_size() as u16;
         packet.length = header_size - MIN_HEADER_LENGTH as u16;
         let epoch_ms = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_millis();
@@ -98,20 +103,22 @@ impl Pinger {
             seq: 0,
             send_buf: Vec::with_capacity(header_size as usize),
             recv_buf: [0; 1024],
-            sent: 0,
-            received: 0,
-            send_times: [0f64; TRACK_PINGS_SIZE],
-            received_packets: [0u64; TRACK_PINGS_SIZE],
-            duplicate_packets: 0,
-            refused_packets: 0,
-            timed_out_packets: 0,
-            epoch_ms,
-            start_time: now,
-            last_ping_time: now,
-            last_receive_time: now,
             interval: Duration::from_millis(interval_ms),
             timeout: Duration::from_millis(if timeout_ms == 0 { u64::MAX } else { timeout_ms }),
             count,
+            statistics: Statistics {
+                sent: 0,
+                received: 0,
+                send_times: [0f64; TRACK_PINGS_SIZE],
+                received_packets: [0u64; TRACK_PINGS_SIZE],
+                duplicate_packets: 0,
+                refused_packets: 0,
+                timed_out_packets: 0,
+                epoch_ms,
+                start_time: now,
+                last_ping_time: now.sub(Duration::from_secs(60)),
+                last_receive_time: now.sub(Duration::from_secs(60)),
+            },
         };
         debug!("Pinger created for {}", pinger.peer);
         Ok(pinger)
@@ -142,15 +149,15 @@ impl Pinger {
                 Err(e) => {
                     if e.kind() == io::ErrorKind::ConnectionRefused {
                         error!("Connection refused: {}", self.peer);
-                        self.refused_packets += 1;
+                        self.statistics.refused_packets += 1;
                     }
                     continue;
                 }
             }
 
             self.seq += 1;
-            self.sent += 1;
-            self.last_ping_time = Instant::now();
+            self.statistics.sent += 1;
+            self.statistics.last_ping_time = Instant::now();
 
             trace!("Waiting for response");
             // To implement the timeout, we use tokio::select! macro. This macro allows us to
@@ -160,7 +167,7 @@ impl Pinger {
             tokio::select! {
                 _ = async { sleep_until(Instant::now().add(self.timeout)).await } => {
                     error!("Timeout {} ms exceeded: {}", self.timeout.as_millis(), self.peer);
-                    self.timed_out_packets += 1;
+                    self.statistics.timed_out_packets += 1;
                 }
                 result = self.socket.recv_from(&mut self.recv_buf) => {
                     match self.process_received(result).await {
@@ -180,12 +187,12 @@ impl Pinger {
         debug!("Finish pinging for {}", self.peer);
         trace!(
             "Stats: epoch: {}, sent: {}, received: {}, duplicate: {}, refused: {}, timed out: {}, seq: {}",
-            self.epoch_ms,
-            self.sent,
-            self.received,
-            self.duplicate_packets,
-            self.refused_packets,
-            self.timed_out_packets,
+            self.statistics.epoch_ms,
+            self.statistics.sent,
+            self.statistics.received,
+            self.statistics.duplicate_packets,
+            self.statistics.refused_packets,
+            self.statistics.timed_out_packets,
             self.seq
         );
         Ok(())
@@ -203,10 +210,11 @@ impl Pinger {
                     self.peer
                 );
                 let response = EchoResponse::unmarshal(&self.recv_buf[..n])?;
-                self.last_receive_time = Instant::now();
+                self.statistics.last_receive_time = Instant::now();
                 let duration = self
+                    .statistics
                     .last_receive_time
-                    .duration_since(self.last_ping_time)
+                    .duration_since(self.statistics.last_ping_time)
                     .as_secs_f64()
                     * 1000f64;
                 debug!(
@@ -215,7 +223,7 @@ impl Pinger {
                     self.recv_buf[0] >> 5, // always 1, though
                     response.header.sequence_number.unwrap_or(0),
                     duration,
-                    if self.received_packets[self.seq as usize % TRACK_PINGS_SIZE] > 1 {
+                    if self.statistics.received_packets[self.seq as usize % TRACK_PINGS_SIZE] > 1 {
                         "(DUP)"
                     } else {
                         ""
@@ -231,12 +239,12 @@ impl Pinger {
                 };
 
                 // Update stats
-                self.send_times[seq as usize % TRACK_PINGS_SIZE] = duration;
-                self.received_packets[seq as usize % TRACK_PINGS_SIZE] += 1;
-                if self.received_packets[seq as usize % TRACK_PINGS_SIZE] > 1 {
-                    self.duplicate_packets += 1;
+                self.statistics.send_times[seq as usize % TRACK_PINGS_SIZE] = duration;
+                self.statistics.received_packets[seq as usize % TRACK_PINGS_SIZE] += 1;
+                if self.statistics.received_packets[seq as usize % TRACK_PINGS_SIZE] > 1 {
+                    self.statistics.duplicate_packets += 1;
                 }
-                self.received += 1;
+                self.statistics.received += 1;
                 Ok(())
             }
             Err(e) => {
@@ -253,7 +261,8 @@ impl Pinger {
         let mut sum = 0.0;
         let mut count = 0;
 
-        for &time in self.send_times.iter().filter(|&&time| time > 0f64) {
+        let statistics = &self.statistics;
+        for &time in statistics.send_times.iter().filter(|&&time| time > 0f64) {
             min = min.min(time);
             max = max.max(time);
             sum += time;
@@ -262,7 +271,7 @@ impl Pinger {
 
         let avg = sum / count as f64;
 
-        let variance = self
+        let variance = statistics
             .send_times
             .iter()
             .filter(|&&time| time > 0f64)
@@ -273,14 +282,16 @@ impl Pinger {
 
         Stats {
             target: self.peer.to_string(),
-            epoch_ms: self.epoch_ms,
-            sent: self.sent,
-            received: self.received,
-            packet_loss_percentage: (self.sent - self.received) as f64 / self.sent as f64 * 100f64,
-            duplicate_packets: self.duplicate_packets,
-            refused_packets: self.refused_packets,
-            timed_out_packets: self.timed_out_packets,
-            duration: self.start_time.elapsed().as_secs_f64() * 1000f64,
+            epoch_ms: statistics.epoch_ms,
+            sent: statistics.sent,
+            received: statistics.received,
+            packet_loss_percentage: (statistics.sent - statistics.received) as f64
+                / statistics.sent as f64
+                * 100f64,
+            duplicate_packets: statistics.duplicate_packets,
+            refused_packets: statistics.refused_packets,
+            timed_out_packets: statistics.timed_out_packets,
+            duration: statistics.start_time.elapsed().as_secs_f64() * 1000f64,
             min,
             avg,
             max,
