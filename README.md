@@ -36,13 +36,14 @@ ping(8) equivalent for GTPv1-U (3GPP TS 29.281).
 ## Usage
 
 ```console
+$ rgtping --help
 ping(8) equivalent for GTPv1-U (3GPP TS 29.281).
 
 Usage: rgtping [OPTIONS] [TARGET_IPS]...
 
 Arguments:
-  [TARGET_IPS]...  Array of IP address and port number (IP:port) to ping, delimited
-                   by a space
+  [TARGET_IPS]...  An array of IP addresses and port numbers (IP:port) to ping,
+                   separated by spaces. If a port is not specified, it defaults to 2152
 
 Options:
   -c, --count <COUNT>
